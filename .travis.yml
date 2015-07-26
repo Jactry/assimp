@@ -1,31 +1,35 @@
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install cmake python3
-  - if [ $LINUX ]; then sudo apt-get install -qq freeglut3-dev libxmu-dev libxi-dev ; fi
-  - echo -e "#ifndef A_R_H_INC\n#define A_R_H_INC\n#define GitVersion ${TRAVIS_JOB_ID}\n#define GitBranch \"${TRAVIS_BRANCH}\"\n#endif // A_R_H_INC" > revision.h
-
-branches:
-  only:
-    - master
+os:
+  - linux
 
 env:
-  global:
-    - PV=r8e PLATF=linux-x86_64 NDK_HOME=${TRAVIS_BUILD_DIR}/android-ndk-${PV} PATH=${PATH}:${NDK_HOME}
-  matrix:
-    - LINUX=1 TRAVIS_NO_EXPORT=YES
-    - LINUX=1 TRAVIS_NO_EXPORT=NO
-    - LINUX=1 SHARED_BUILD=ON
-    - LINUX=1 SHARED_BUILD=OFF
-    - ANDROID=1
+  - WINEARCH=win32
+  - WINEARCH=""
 
-language: cpp
+cache: apt
+
+before_install:
+  - "export DISPLAY=:99.0"
+  - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 800x600x16"
+
+before_script:
+  - sudo add-apt-repository -y ppa:pipelight/stable
+  - sudo apt-get update -qq
+  - sudo apt-get install -y --install-recommends wine-staging wine-staging-compat subversion
+  - wget https://raw.githubusercontent.com/Jactry/msys2_deb/master/msys2-scripts_20150725_i386.deb
+  - sudo dpkg -i msys2-scripts_20150725_i386.deb
+
+language: c
 
 compiler:
   - gcc
-  - clang
-
-install:
-  - if [ $ANDROID ]; then wget -c http://dl.google.com/android/ndk/android-ndk-${PV}-${PLATF}.tar.bz2 && tar xf android-ndk-${PV}-${PLATF}.tar.bz2 ; fi
 
 script:
-  - . ./.travis.sh
+  - srcdir=~/src
+  - _realname=assimp
+  - pkgbuild_repo=https://github.com/Alexpux/MINGW-packages/trunk/mingw-w64-assimp-git
+  - svn co ${pkgbuild_repo} ${srcdir}
+  - ln -svf ${PWD} ${srcdir}/${_realname}
+  - cp ${srcdir}/PKGBUILD ~
+  - msys2-prepare
+  - msys2-wrapper "pacman -S --needed --noconfirm mingw-w64-i686-toolchain"
+  - msys2-wrapper "makepkg-mingw -s --noconfirm --noprogressbar --noextract --skippgpcheck -f"
